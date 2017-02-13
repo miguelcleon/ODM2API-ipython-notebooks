@@ -2,8 +2,9 @@
 import sys
 import os
 import getpass
-from IPython.display import display
+from IPython.display import display, HTML
 import ipywidgets as widgets
+from ipywidgets import Layout, HBox, Label
 import numpy as np
 from bokeh.plotting import figure, show, hplot
 from bokeh.models import ColumnDataSource,CustomJS
@@ -18,7 +19,7 @@ def selectPlot(s1,selectedResult):
     
     for result in selectedResult:
         xaxistitle = str(result.variableCode)
-    p = figure(tools=TOOLS, plot_width=500, plot_height=500, x_axis_type="datetime", 
+    p = figure(tools=TOOLS, plot_width=400, plot_height=400, x_axis_type="datetime", 
               title = xaxistitle)
     p.circle('x', 'y', source=s1)
     #selected = []
@@ -36,9 +37,9 @@ def selectPlot(s1,selectedResult):
     minimum = np.nanmin(data['y'])
     minimum = minimum[0]
     maximum = maximum[0]
-    print(minimum)
-    print(maximum)
-    p2 = figure(plot_width=500, plot_height=500, y_range=(minimum, maximum), x_axis_type="datetime",
+    #print(minimum)
+    #print(maximum)
+    p2 = figure(plot_width=400, plot_height=400, y_range=(minimum*.9, maximum*1.1), x_axis_type="datetime",
                 tools="", title="Selected Data")
     p2.circle('x', 'y', source=s2, alpha=0.6)
     s1.callback = CustomJS(args=dict(s2=s2), code="""
@@ -158,6 +159,28 @@ def startDateEndDateContainer():
     submit_btn.on_click(submit)
     container.children = [start_date_text,end_date_text, submit_btn]
     return container
+
+
+def dataqualityWidget(DBSession):
+    dataquality_code =  DBSession.query(CVQualityCode)
+    def print_dataquality_code_name(code):
+        print(code)
+    def on_change(change):
+        print(change['new'])
+    dqtids = []
+    dqtnames = {}
+    for dq in dataquality_code:
+        dqtids.append(dq.Name)
+        namestr = str(dq.Name   + " - " + dq.Term)
+        dqtnames[namestr] = dq.Name
+    dataquality_codeWidget = widgets.Dropdown(options=dqtnames, layout=Layout(width='50%', height='30px'))
+    dataquality_codeWidget.label = ''
+    dqwidget = widgets.interactive(print_dataquality_code_name,code=dataquality_codeWidget)
+    dqwidget.observe(on_change)
+    #label = Label('data quality ',layout=Layout(height='30px'))
+    #box = HBox([label, dataquality_codeWidget]) #dqwidget
+    return dataquality_codeWidget, dqwidget
+
 def actionWidget(DBSession):
 
     #featureaction = 1700
@@ -166,7 +189,7 @@ def actionWidget(DBSession):
     actionnames = {}
 
     def print_action_name(action):
-        print action
+        print(action)
     def on_change(change):
         print(change['new'])
 
@@ -180,7 +203,47 @@ def actionWidget(DBSession):
         actionnames[namestr]=  str(a.ActionID)
         #print(detailr.Methods)
     print(actionids)
-    actionWidget = widgets.Dropdown(options=actionnames)
+    actionWidget = widgets.Dropdown(options=actionnames, layout=Layout(width='50%', height='30px'))
+    awidget = widgets.interactive(print_action_name,action=actionWidget)
+    awidget.observe(on_change)
+    return actionWidget, awidget
+
+def actionWidgetNotPulse(DBSession):
+
+    #featureaction = 1700
+    dsrs = DBSession.query(DataSetsResults).filter_by(DataSetID=17)
+    dsrids = []
+    for dsr in dsrs:
+        dsrids.append(dsr.ResultID)
+    results =  DBSession.query(TimeSeriesResults).filter(~TimeSeriesResults.ResultID.in_(dsrids))
+    featureactions = DBSession.query(FeatureActions).join(Results).filter(~Results.ResultID.in_(dsrids))
+    faids =[]
+    for fa in featureactions:
+        faids.append(fa.FeatureActionID)
+    #actions = DBSession.query(Actions).filter_by(ActionTypeCV = 'Observation'
+    #                                            ).join(FeatureActions).filter(FeatureActions.FeatureActionID.in_(faids))
+
+    actionids=[34, 35,21,22,8] #34,
+    actions = DBSession.query(Actions).filter(Actions.ActionID.in_(actionids))
+    actionids = []
+    actionnames = {}
+
+    def print_action_name(action):
+        print(action)
+    def on_change(change):
+        print(change['new'])
+
+    for a in actions:
+        #print(r.ResultID)
+        actionids.append(str(a.ActionID))
+        #action_type=read.CVActionType(name=a.ActionTypeCV) 
+        method =  DBSession.query(Methods).filter_by(MethodID =a.MethodID).one()
+        #detailr = read.getDetailedResultInfo(resultTypeCV = 'Time series coverage',resultID=r.ResultID)
+        namestr = str(method.MethodCode   + "- Begin date - " + str(a.BeginDateTime))
+        actionnames[namestr]=  str(a.ActionID)
+        #print(detailr.Methods)
+    print(actionids)
+    actionWidget = widgets.RadioButtons(options=actionnames) #layout=Layout(width='50%',min_width='50%'), height='30px'
     awidget = widgets.interactive(print_action_name,action=actionWidget)
     awidget.observe(on_change)
     return actionWidget, awidget
@@ -192,7 +255,7 @@ def resultWidget(read, actionid):
     resultnames = {}
 
     def print_result_name(result):
-        print result
+        print(result)
     def on_change(change):
         print(change['new'])
 
@@ -205,25 +268,7 @@ def resultWidget(read, actionid):
             resultnames[namestr]=  detail.resultID
         #print(detailr.Methods)
     print(resultids)
-    resultWidget = widgets.Dropdown(options=resultnames)
+    resultWidget = widgets.RadioButtons(options=resultnames)
     rwidget = widgets.interactive(print_result_name,result=resultWidget)
     rwidget.observe(on_change)
     return resultWidget, rwidget
-
-def dataqualityWidget(DBSession):
-    dataquality_code =  DBSession.query(DBSession)
-    def print_dataquality_code_name(dataquality_code):
-        print dataquality_code
-    def on_change(change):
-        print(change['new'])
-    dqtids = []
-    dqtnames = {}
-    for dq in dataquality_code:
-        dqtids.append(dq.Name)
-        namestr = str(dq.Name   + " - " + dq.Term)
-        dqtnames[namestr] = dq.Name
-    dataquality_codeWidget = widgets.Dropdown(options=dqtnames)
-    dqwidget = widgets.interactive(print_dataquality_code_name,dataquality_code=dataquality_codeWidget)
-    dqwidget.observe(on_change)
-    display(dqwidget)
-    return dataquality_codeWidget, dqwidget
